@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="PM-STAT2024-9" author="paulouskiyulyan@gmail.com">
+        <comment>Create table Balance-Changes</comment>
+        <createTable tableName="balance-changes">
+            <column autoIncrement="true" name="id" type="bigint">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_balance_changes"/>
+            </column>
+            <column name="date" type="datetime">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change" type="varchar(10)" defaultValue="-">
+                <constraints nullable="false"/>
+            </column>
+            <column name="balance_id" type="int">
+                <constraints referencedTableName="balance"
+                             referencedColumnNames="id"
+                             foreignKeyName="fk_balance_changes_balance"
+                             nullable="false"/>
+            </column>
+            <column name="match_id" type="bigint">
+                <constraints referencedColumnNames="id"
+                             referencedTableName="matches"
+                             foreignKeyName="fk_balance_changes_match"
+                             nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

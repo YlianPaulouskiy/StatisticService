@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="PM-STAT2024-8" author="paulouskiyulyan@gmail.com">
+        <comment>Create table Balance</comment>
+        <createTable tableName="balance">
+            <column autoIncrement="true" name="id" type="int">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_balance"/>
+            </column>
+            <column name="balance" type="decimal(5,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="default_bet" type="decimal(5,2)"/>
+            <column name="tourney_count" type="bigint"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="PM-STAT2024-7" author="paulouskiyulyan@gmail.com">
+        <comment>Create table Matches</comment>
+        <sql>
+            create table matches(
+                                    id bigint primary key,
+                                    full_name varchar(255) not null,
+                                    date datetime not null,
+                                    unique (date, full_name),
+                                    bet_amount decimal(5,2) not null,
+                                    result varchar(4) not null,
+                                    first_team_id bigint not null,
+                                    foreign key (first_team_id) references teams(id),
+                                    second_team_id bigint not null,
+                                    foreign key (second_team_id) references teams(id),
+                                    tourney_id bigint not null,
+                                    foreign key (tourney_id) references tourneys(id),
+                                    stake_id bigint not null,
+                                    foreign key (stake_id) references stakes(id)
+            );
+        </sql>
+
+    </changeSet>
+
+</databaseChangeLog>

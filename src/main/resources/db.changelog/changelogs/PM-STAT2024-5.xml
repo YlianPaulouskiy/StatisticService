@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="PM-STAT2024-5" author="paulouskiyulyan@gmail.com">
+        <comment>Create table Stakes</comment>
+        <createTable tableName="stakes">
+            <column autoIncrement="false" name="id" type="bigint">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_stakes"/>
+            </column>
+            <column name="side_name" type="varchar(5)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ratio" type="decimal(4,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_winner" type="boolean" defaultValue="FALSE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="stake_type_id" type="bigint">
+                <constraints referencedTableName="stake-types"
+                             referencedColumnNames="id"
+                             foreignKeyName="fk_stake_stake_types"
+                             nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>
