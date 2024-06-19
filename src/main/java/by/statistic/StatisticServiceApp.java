@@ -1,5 +1,6 @@
 package by.statistic;
 
+import by.statistic.api.client.PmClient;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,9 +8,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class StatisticServiceApp {
 
     public static void main(String[] args) {
-        var context = SpringApplication.run(StatisticServiceApp.class, args);
-
-        context.close();
+        try (var context = SpringApplication.run(StatisticServiceApp.class, args)){
+            var pmClient = context.getBean(PmClient.class);
+            System.out.println(pmClient.getLiveMatches());
+        }
     }
 
 }

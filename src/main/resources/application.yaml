@@ -14,3 +14,5 @@ spring:
 pm:
   service:
     url: http://localhost:8888
+  cs:
+    name: Counter-Strike 2
