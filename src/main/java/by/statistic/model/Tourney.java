@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @Entity
@@ -31,5 +32,8 @@ public class Tourney {
     @ManyToOne
     @JoinColumn(name = "sport_type_id", referencedColumnName = "id", nullable = false)
     private SportType sportType;
+
+    @OneToMany(mappedBy = "tourney")
+    private List<Match> matches;
 
 }

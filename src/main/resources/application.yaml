@@ -16,3 +16,6 @@ pm:
     url: http://localhost:8888
   cs:
     name: Counter-Strike 2
+  stake-type:
+    total:
+      id: 702

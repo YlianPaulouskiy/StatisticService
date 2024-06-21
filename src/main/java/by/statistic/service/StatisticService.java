@@ -2,19 +2,18 @@ package by.statistic.service;
 
 import by.pm.model.*;
 import by.statistic.api.client.PmClient;
-import by.statistic.model.SportType;
+import by.statistic.model.Change;
 import by.statistic.repository.*;
+import by.statistic.service.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
+
+import static by.statistic.utils.DateTimeUtils.*;
 
 @Service
 @RequiredArgsConstructor
@@ -22,12 +21,29 @@ public class StatisticService {
 
     @Value("${pm.cs.name}")
     private String counterStrikeName;
+    @Value("${pm.stake-type.total.id}")
+    private String totalStakeTypeId;
+
     private final PmClient pmClient;
+
+    private final GameMapper gameMapper;
+    private final MatchMapper matchMapper;
+    private final SportTypeMapper sportTypeMapper;
+    private final StakeMapper stakeMapper;
+    private final StakeTypeMapper stakeTypeMapper;
+    private final TeamMapper teamMapper;
+    private final TourneyMapper tourneyMapper;
+
+
     private final TourneyRepository tourneyRepository;
     private final BalanceRepository balanceRepository;
     private final ChangeRepository changeBalanceRepository;
+    private final MatchRepository matchRepository;
     private final SportTypeRepository sportTypeRepository;
     private final GameRepository gameRepository;
+    private final TeamRepository teamRepository;
+    private final StakeTypeRepository stakeTypeRepository;
+    private final StakeRepository stakeRepository;
 
 
     // check ending of matches in database
@@ -58,32 +74,100 @@ public class StatisticService {
                                                 check SportType exists in DB (save)
                                                 ---/\--- repeat if body ---/\---
         */
+        Sport sport = pmClient.getFutureMatches(); // just 1 send method  to pm.service because can be lock
+//        saveTourneys(sport); now save by hand
+        Game game = getGameByName(sport.getGameList(), counterStrikeName);
+        for (Tourney tourney : game.getTourneyList()) {
+            if (tourneyRepository.existsById(tourney.getId())) {
+                for (Match match : tourney.getMatchList()) {
+                    if (isAvailableToBet(tourney, match)) {
 
-
+                    }
+                }
+            }
+        }
     }
 
-    private void saveTourneys() throws ParseException {
-        Sport sport = pmClient.getFutureMatches();
-        saveSportType(sport);
+    private void placeBet(Tourney tourney, Match match) {
+        //save teams
+        by.statistic.model.Team savedFirstTeam = saveTeam(match.getFirstTeam());
+        by.statistic.model.Team savedSecondTeam = saveTeam(match.getSecondTeam());
+        //save stake
+        by.statistic.model.Stake savedStake = saveStake(match);
+        //save match
+        by.statistic.model.Match savedMatch = matchMapper.toDbModel(match);
+        savedMatch.setFirstTeam(savedFirstTeam);
+        savedMatch.setSecondTeam(savedSecondTeam);
+        savedMatch.setStake(savedStake);
+        savedMatch  = matchRepository.save(savedMatch);
+        //placeBet расчет суммы, поиск id для ставок, сделать ставку
+        //save BalanceChange // запись того, что ставка сделана и повлияет на баланс
+    }
+
+    /**
+     * Save Stake in Db
+     */
+    private by.statistic.model.Stake saveStake(Match match) {
+        var stakeType = getTotalStakeType(match);
+        by.statistic.model.StakeType savedStakeType = saveStakeType(stakeType);
+        by.statistic.model.Stake savedStake =
+                stakeMapper.toDbModel(getBetStake(stakeType.getStakes()));
+        savedStake.setStakeType(savedStakeType);
+        return stakeRepository.save(savedStake);
+    }
+
+    /**
+     * Get Stake for Bet with min ratio
+     */
+    private Stake getBetStake(List<Stake> stakes) {
+        return stakes.get(0).getRatio() > stakes.get(1).getRatio()
+                ? stakes.get(1) : stakes.get(0);
+    }
+
+
+    /**
+     * Save StakeType in DB if needed
+     */
+    private by.statistic.model.StakeType saveStakeType(StakeType stakeType) {
+        return stakeTypeRepository.existsById(stakeType.getId()) ?
+                stakeTypeRepository.getReferenceById(stakeType.getId()) :
+                stakeTypeRepository.save(
+                        stakeTypeMapper.toDbModel(stakeType));
+    }
+
+    /**
+     * Get Stake type "Исход (2 исхода)"
+     */
+    private StakeType getTotalStakeType(Match match) {
+        return match.getStakeTypes()
+                .stream()
+                .filter(stakeType -> stakeType.getId().toString().equals(totalStakeTypeId))
+                .findFirst().orElseThrow();
+    }
+
+    /**
+     * Save team in DB if needed
+     */
+    private by.statistic.model.Team saveTeam(String teamName) {
+        return teamRepository.existsByName(teamName) ?
+                teamRepository.findByName(teamName) :
+                teamRepository.save(
+                        teamMapper.toDbModel(teamName));
+    }
+
+
+    /**
+     * Save tourney in DB if needed
+     */
+    private void saveTourneys(Sport sport) throws ParseException {
+        by.statistic.model.SportType savedSportType = saveSportType(sport);
         Game game = getGameByName(sport.getGameList(), counterStrikeName);
-        saveGame(game);
+        by.statistic.model.Game savedGame = saveGame(game);
         for (Tourney tourney : game.getTourneyList()) {
             if (isAvailableToSave(tourney)) {
-                by.statistic.model.Tourney tourneyToSave = new by.statistic.model.Tourney();
-                tourneyToSave.setId(tourney.getId());
-                tourneyToSave.setTitle(tourney.getTitle());
-                if (sportTypeRepository.existsById(sport.getId())) {
-                    tourneyToSave.setSportType(
-                            sportTypeRepository.getReferenceById(sport.getId()));
-                } else {
-                    throw new RuntimeException("SportType with id " + sport.getId() + " is not exists.");
-                }
-                if (gameRepository.existsById(game.getId())) {
-                    tourneyToSave.setGame(
-                            gameRepository.getReferenceById(game.getId()));
-                } else {
-                    throw new RuntimeException("Game with id " + game.getId() + " is not exists.");
-                }
+                by.statistic.model.Tourney tourneyToSave = tourneyMapper.toDbModel(tourney);
+                tourneyToSave.setSportType(savedSportType);
+                tourneyToSave.setGame(savedGame);
                 tourneyRepository.save(tourneyToSave);
             }
         }
@@ -92,25 +176,21 @@ public class StatisticService {
     /**
      * Save SportType in DB if needed
      */
-    private void saveSportType(Sport sport) {
-        if (!sportTypeRepository.existsById(sport.getId())) {
-            by.statistic.model.SportType sportType = new by.statistic.model.SportType();
-            sportType.setId(sport.getId());
-            sportType.setName(sportType.getName());
-            sportTypeRepository.save(sportType);
-        }
+    private by.statistic.model.SportType saveSportType(Sport sport) {
+        return sportTypeRepository.existsById(sport.getId()) ?
+                sportTypeRepository.getReferenceById(sport.getId()) :
+                sportTypeRepository.save(
+                        sportTypeMapper.toDbModel(sport));
     }
 
     /**
      * Save Game in DB if needed
      */
-    private void saveGame(Game game) {
-        if (!gameRepository.existsById(game.getId())) {
-            by.statistic.model.Game gameToSave = new by.statistic.model.Game();
-            gameToSave.setId(game.getId());
-            gameToSave.setName(game.getName());
-            gameRepository.save(gameToSave);
-        }
+    private by.statistic.model.Game saveGame(Game game) {
+        return gameRepository.existsById(game.getId()) ?
+                gameRepository.getReferenceById(game.getId()) :
+                gameRepository.save(
+                        gameMapper.toDbModel(game));
     }
 
     /**
@@ -133,23 +213,28 @@ public class StatisticService {
         } else if (tourney.getTitle().contains("America")
                 || tourney.getTitle().contains("2x2")) {
             return false;
-        } else return isWaitingIn3Days(tourney);
+        } else return isTourneyMatchStartedIn3Days(tourney);
     }
 
     /**
-     * Check if matches of Tourney is started the next 3 days
+     * Check all conditions availability to place bet at this betMatch
      */
-    private boolean isWaitingIn3Days(Tourney tourney) throws ParseException {
-        return tourney.getMatchList().get(0)
-                .getDate().before(after3daysFromNow());
-    }
-
-    /**
-     * Get Date after 3 days from now
-     */
-    private Date after3daysFromNow() throws ParseException {
-        return new SimpleDateFormat("yyyy-MM-dd").parse(
-                LocalDate.now().plusDays(3L).toString());
+    private boolean isAvailableToBet(Tourney tourney, Match betMatch) {
+        if (matchRepository.existsById(betMatch.getId())) { //repeat bet check
+            return false;
+        }
+        List<by.statistic.model.Match> notCompleteMatches = changeBalanceRepository.findAllByMatchTourneyTitle(tourney.getTitle())
+                .stream()
+                .filter(change -> change.getChange().equalsIgnoreCase("-"))
+                .map(Change::getMatch)
+                .toList();
+        for (by.statistic.model.Match match : notCompleteMatches) {
+            if (match.getTourney().getId().equals(tourney.getId()) && // is the same tourney
+                    isTimeBetweenMatchesMoreThan30Min(betMatch.getDate(), match.getDate())) { //is time between matches more than 30 min
+                return false;
+            }
+        }
+        return true;
     }
 
 }
