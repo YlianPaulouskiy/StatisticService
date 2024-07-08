@@ -2,6 +2,7 @@ package by.statistic.service;
 
 import by.pm.model.*;
 import by.statistic.api.client.PmClient;
+import by.statistic.model.Balance;
 import by.statistic.model.Change;
 import by.statistic.repository.*;
 import by.statistic.service.mapper.*;
@@ -10,7 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.text.ParseException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static by.statistic.utils.DateTimeUtils.*;
@@ -81,7 +84,7 @@ public class StatisticService {
             if (tourneyRepository.existsById(tourney.getId())) {
                 for (Match match : tourney.getMatchList()) {
                     if (isAvailableToBet(tourney, match)) {
-
+                        placeBet(tourney, match);
                     }
                 }
             }
@@ -99,9 +102,54 @@ public class StatisticService {
         savedMatch.setFirstTeam(savedFirstTeam);
         savedMatch.setSecondTeam(savedSecondTeam);
         savedMatch.setStake(savedStake);
-        savedMatch  = matchRepository.save(savedMatch);
+        savedMatch = matchRepository.save(savedMatch);
         //placeBet расчет суммы, поиск id для ставок, сделать ставку
-        //save BalanceChange // запись того, что ставка сделана и повлияет на баланс
+        Stake stake = getBetStake(getTotalStakeType(match).getStakes());
+        Double betAmount = calculateCashForBet(tourney, stake);
+        //        pmClient.placeBet(match.getId(), stake.getId(), calculateCashForBet(tourney, stake));
+        //for testing!!!
+        System.out.println("Bet for event: " + match.getId() +
+                "\nStake id: " + stake.getId() +
+                "\nCash for bet: " + betAmount);
+        //change totalBalance
+        changeTotalBalance(betAmount); // изменение основного баланса
+        //save BalanceChange
+        saveDefultChange(savedMatch); // запись того, что ставка сделана и повлияет на баланс
+    }
+
+    /**
+     * Save BalanceChange in DB
+     */
+    private Change saveDefultChange(by.statistic.model.Match match) {
+        Change change = new Change();
+        change.setBalance(totalBalance());
+        change.setDate(LocalDateTime.now());
+        change.setMatch(match);
+        return changeBalanceRepository.save(change);
+    }
+
+    /**
+     * Save Balance in DB with new changes
+     */
+    private void changeTotalBalance(Double change) {
+        Balance balance = totalBalance();
+        var newBalance = balance.getBalance().add(BigDecimal.valueOf(change));
+        balance.setBalance(newBalance);
+        balanceRepository.save(balance);
+    }
+
+    /**
+     * Return cash for bet by catchUp strategy
+     */
+    private Double calculateCashForBet(Tourney tourney, Stake stake) {
+        by.statistic.model.Tourney betTourney = tourneyRepository.getReferenceById(tourney.getId());
+        if (betTourney.getLosses().compareTo(BigDecimal.ZERO) == 0) {
+            return totalBalance().getDefaultBet().doubleValue();
+        } else {
+            double losses = betTourney.getLosses().doubleValue();
+            double netProfit = 0.0;
+            return (losses + netProfit) / (stake.getRatio() - 1);
+        }
     }
 
     /**
@@ -204,10 +252,18 @@ public class StatisticService {
     }
 
     /**
+     * Return balance from DB or throw
+     */
+    private Balance totalBalance() {
+        return balanceRepository.findById(1)
+                .orElseThrow(() -> new RuntimeException("Balance with id = 1 not found. Check Database!!!"));
+    }
+
+    /**
      * Check is tourney available to save
      */
     private boolean isAvailableToSave(Tourney tourney) throws ParseException {
-        if (balanceRepository.getReferenceById(1).getTourneyCount()
+        if (totalBalance().getTourneyCount()
                 == tourneyRepository.count()) {
             return false;
         } else if (tourney.getTitle().contains("America")
